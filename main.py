@@ -6,18 +6,7 @@ import openpyxl
 app = Flask(__name__)
 
 # ===== Load tokens =====
-def load_tokens(filename="popo.env"):
-    tokens = {}
-    with open(filename) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            tokens[key] = value
-    return tokens
 
-tokens = load_tokens()
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
