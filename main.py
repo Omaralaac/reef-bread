@@ -467,6 +467,235 @@ def process_order_action(sender_id, action_type):
     send_main_menu(sender_id)
 
 
+import sqlite3
+from datetime import datetime
+
+# ===== قاعدة بيانات SQL =====
+DB_PATH = "orders.db"
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# استدعاء بيانات العميل حسب رقم الهاتف
+def get_user_data_by_phone(phone):
+    conn = get_db_connection()
+    user_data = conn.execute(
+        "SELECT * FROM orders WHERE phone=? ORDER BY created_at DESC LIMIT 1", (phone,)
+    ).fetchone()
+    conn.close()
+    return dict(user_data) if user_data else None
+
+# حفظ بيانات الجملة (Wholesale)
+def save_wholesale_to_sql(wholesale_data):
+    conn = get_db_connection()
+    conn.execute(
+        "INSERT INTO wholesale_orders (name, phone, company, products, created_at) VALUES (?, ?, ?, ?, ?)",
+        (
+            wholesale_data.get("الاسم"),
+            wholesale_data.get("رقم الهاتف"),
+            wholesale_data.get("الشركة"),
+            str(wholesale_data.get("المنتجات")),  # حفظ كـ string JSON
+            datetime.now()
+        )
+    )
+    conn.commit()
+    conn.close()
+
+# إضافة أوردر جديد عادي
+def save_order_to_sql(customer_data, products):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO orders (name, phone, province, area, street, building, apartment, order_text, total_price, delivery, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            customer_data.get("الاسم ثلاثي"),
+            customer_data.get("رقم هاتف ويفضل يكون عليه واتساب"),
+            customer_data.get("اسم المحافظة"),
+            customer_data.get("اسم المنطقة"),
+            customer_data.get("الشارع", ""),
+            customer_data.get("المبنى", ""),
+            customer_data.get("الشقة", ""),
+            str(products),
+            sum([p['price']*p['quantity'] for p in products]),  # مجموع السعر
+            customer_data.get("التوصيل", "delivery"),
+            datetime.now()
+        )
+    )
+    conn.commit()
+    conn.close()
+
+# ===== handle_message (SQL-ready) =====
+def handle_message(sender_id, message):
+    text = message.get("text", "").strip()
+    if not text:
+        return
+
+    # استرجاع أو إنشاء جلسة مستخدم مؤقتة (session) في SQL أو dict مؤقت للـ stage
+    # يمكن استبدال dict هذا بجدول user_sessions في DB
+    user = USER_SESSIONS.get(sender_id, {
+        "stage": "collecting_data",
+        "current_question": 0,
+        "data_fields": ["رقم هاتف ويفضل يكون عليه واتساب","اسم المحافظة","اسم المنطقة"],
+        "customer_data": {},
+        "wholesale_fields": ["الاسم","رقم الهاتف","الشركة","المنتجات"],
+        "current_wholesale_question": 0,
+        "wholesale_data": {}
+    })
+
+    # 1. جمع بيانات الأوردر العادي
+    if user["stage"] == "collecting_data":
+        field = user["data_fields"][user["current_question"]]
+
+        if field == "رقم هاتف ويفضل يكون عليه واتساب":
+            if not (text.isdigit() and len(text) == 11):
+                send_message(sender_id, "🚫 رقم غير صحيح! ارسل رقم صحيح مكون من 11 رقم.")
+                return
+
+            existing_data = get_user_data_by_phone(text)
+            if existing_data:
+                user["customer_data"] = existing_data
+                user["stage"] = "confirm_existing_data"
+                summary = (
+                    f"👋 أهلاً بك من جديد يا {existing_data.get('name', 'عميلنا العزيز')}!\n"
+                    f"📍 العنوان المسجل: {existing_data.get('province')} - {existing_data.get('area')}\n"
+                    "هل تريد استخدام نفس البيانات السابقة؟"
+                )
+                quick_replies = [
+                    {"content_type": "text", "title": "✅ نعم، استخدمها", "payload": "USE_OLD_DATA"},
+                    {"content_type": "text", "title": "✏️ لا، بيانات جديدة", "payload": "RE-ENTER_DATA"}
+                ]
+                send_quick_replies(sender_id, summary, quick_replies)
+                USER_SESSIONS[sender_id] = user
+                return
+
+        if field == "اسم المحافظة":
+            allowed = ["القاهرة","قاهره","القاهرة","القاهره","الجيزة","الجيزه","الاسكندرية","الاسكندريه","القليوبية","قليوبية","القليوبيه","القليوبيه"]
+            if text not in allowed:
+                send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
+                user["stage"] = "welcome"
+                send_main_menu(sender_id)
+                USER_SESSIONS[sender_id] = user
+                return
+
+        if field == "اسم المنطقة":
+            gov = user["customer_data"].get("اسم المحافظة", "")
+            allowed_qalyubia = ["العبور","شبرا الخيمة","شبرا الخيمه","الخصوص"]
+            if "قليوبية" in gov or "القليوبية" in gov:
+                if text not in allowed_qalyubia:
+                    msg = (
+                        f"عذراً، منطقة '{text}' في القليوبية متاح لها موزعين فقط حالياً. 😔\n"
+                        "المناطق المتاحة للتوصيل المباشر: (العبور - شبرا الخيمة - الخصوص).\n"
+                        "يمكنك البحث عن أقرب موزع لك من القائمة الرئيسية."
+                    )
+                    send_message(sender_id, msg)
+                    user["stage"] = "welcome"
+                    send_main_menu(sender_id)
+                    USER_SESSIONS[sender_id] = user
+                    return
+
+        user["customer_data"][field] = text
+        user["current_question"] += 1
+
+        if user["current_question"] < len(user["data_fields"]):
+            ask_next_question(sender_id)
+        else:
+            user["stage"] = "choosing_products"
+            send_products(sender_id)
+
+        USER_SESSIONS[sender_id] = user
+        return
+
+    # 2. البحث عن الموزعين
+    elif user["stage"] == "search_distributor":
+        result = get_distributors(text)
+        if result == "DIRECT_DELIVERY_ONLY":
+            send_message(sender_id, "📍 هذه المنطقة متاح بها توصيل للمنازل فقط.\nاضغط '🛒 طلب أوردر' للبدء.")
+        elif result == "OUT_OF_SCOPE":
+            send_message(sender_id, "بعتذر لحضرتك ولكن منطقة حضرتك خارج حيز التوصيل حالياً. 😔")
+        else:
+            send_message(sender_id, result)
+
+        user["stage"] = "welcome"
+        send_main_menu(sender_id)
+        USER_SESSIONS[sender_id] = user
+        return
+
+    # 3. بيانات الجملة (Wholesale)
+    elif user["stage"] == "wholesale":
+        fields = user.get("wholesale_fields", [])
+        idx = user.get("current_wholesale_question", 0)
+
+        if idx < len(fields):
+            user["wholesale_data"][fields[idx]] = text
+            user["current_wholesale_question"] += 1
+
+            if user["current_wholesale_question"] < len(fields):
+                send_message(sender_id, f"من فضلك اكتب {fields[user['current_wholesale_question']]}:")
+            else:
+                save_wholesale_to_sql(user["wholesale_data"])
+                send_message(sender_id, "✅ تم تسجيل بياناتك بنجاح. سيتواصل معك قسم الجملة قريباً. 💚")
+                user["stage"] = "welcome"
+                user["current_wholesale_question"] = 0
+                user["wholesale_data"] = {}
+                send_main_menu(sender_id)
+
+        else:
+            user["stage"] = "welcome"
+            user["current_wholesale_question"] = 0
+            send_main_menu(sender_id)
+
+        USER_SESSIONS[sender_id] = user
+        return
+
+    # 4. تتبع الأوردر
+    elif user["stage"] == "track_ask_phone":
+        existing_data = get_user_data_by_phone(text)
+
+        if existing_data:
+            last_order_details = existing_data.get('order_text', 'لا يوجد طلبات سابقة')
+            user["customer_data"] = existing_data
+            user["temp_phone"] = text
+            user["stage"] = "order_found_options"
+
+            summary = (
+                f"✅ تم العثور على بياناتك يا {existing_data.get('name', 'فندم')}!\n"
+                f"📍 العنوان: {existing_data.get('province')} - {existing_data.get('area')}\n"
+                f"📦 أخر أوردر ليك كان: ({last_order_details})\n\n"
+                "كيف يمكننا مساعدتك اليوم؟"
+            )
+            quick_replies = [
+                {"content_type": "text", "title": "🔍 استفسار عن الحالة", "payload": "TRACK_INQUIRY"},
+                {"content_type": "text", "title": "➕ إضافة أصناف", "payload": "MODIFY_ORDER_MENU"},
+                {"content_type": "text", "title": "❌ إلغاء الطلب", "payload": "CANCEL_EXISTING_ORDER"},
+                {"content_type": "text", "title": "🏠 القائمة الرئيسية", "payload": "MAIN_MENU"}
+            ]
+            send_quick_replies(sender_id, summary, quick_replies)
+        else:
+            msg = (
+                "لم نجد أي طلبات مسجلة بهذا الرقم حالياً 🧐\n\n"
+                "ربما تم كتابة الرقم بشكل خاطئ؟ أو ربما لم تجرب طعم 'خبز ريف' حتى الآن! 💚✨\n"
+                "يسعدنا جداً أن تنضم إلينا وتطلب أوردرك الأول الآن."
+            )
+            quick_replies = [
+                {"content_type": "text", "title": "🛒 اطلب أوردر جديد", "payload": "START_ORDER"},
+                {"content_type": "text", "title": "🔢 تجربة رقم آخر", "payload": "TRACK_ORDER_MENU"},
+                {"content_type": "text", "title": "🏠 العودة للرئيسية", "payload": "MAIN_MENU"}
+            ]
+            send_quick_replies(sender_id, msg, quick_replies)
+
+        USER_SESSIONS[sender_id] = user
+        return
+
+    # العودة للقائمة الرئيسية
+    if user["stage"] == "welcome" or text.lower() in ["menu", "القائمة", "الرئيسية"]:
+        send_welcome(sender_id)
+        USER_SESSIONS[sender_id] = user
+
+
+
 # ===== دالة handle_postback =====
 def handle_postback(sender_id, postback):
     payload = postback.get("payload")
