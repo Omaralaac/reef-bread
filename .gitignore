@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Environment variables
+*.env
+popo.env
+
+# Excel / بيانات محلية
+*.xlsx
+*.xls
+
+# أي ملفات نصية أو بيانات خاصة
+*.txt
+
+# Logs
+*.log

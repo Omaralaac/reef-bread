@@ -4,7 +4,18 @@ from openpyxl import Workbook, load_workbook
 import os
 import openpyxl
 app = Flask(__name__)
+#############################################
+***load_dotenv("popo.env")  # أو popo.env.local عندك محلي
 
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+WHOLESALE_TELEGRAM_BOT_TOKEN = os.getenv("WHOLESALE_TELEGRAM_BOT_TOKEN")
+WHOLESALE_TELEGRAM_CHAT_ID = os.getenv("WHOLESALE_TELEGRAM_CHAT_ID")
+TRACKING_BOT_TOKEN = os.getenv("TRACKING_BOT_TOKEN")
+TRACKING_CHAT_ID = os.getenv("TRACKING_CHAT_ID")*/
+#########################################
 # ===== Load tokens =====
 def load_tokens(filename="popo.env"):
     tokens = {}
