@@ -383,6 +383,17 @@ def send_quick_replies(recipient_id, text, quick_replies):
     except Exception as e:
         print(f"❌ فشل إرسال Quick Replies فيسبوك: {e}")
 
+def send_main_menu(sender_id):
+    quick_replies = [
+        {"content_type": "text", "title": "ℹ️ استفسار عن منتج", "payload": "INQUIRY_MENU"},
+        {"content_type": "text", "title": "🛒 طلب أوردر", "payload": "START_ORDER"},
+        {"content_type": "text", "title": "📦 متابعة/تعديل طلبك", "payload": "TRACK_ORDER_MENU"},
+        {"content_type": "text", "title": "📍 أماكن توافرنا", "payload": "FIND_DISTRIBUTORS"}, # الزر الجديد
+        {"content_type": "text", "title": "🏢 طلبات الجملة", "payload": "INQ_WHOLESALE"}
+    ]
+    send_quick_replies(sender_id, "مرحباً بك في خبز ريف 💚\nاختر أحد الخيارات:", quick_replies)
+
+
 def send_welcome(sender_id):
     text = (
         "شكراً لتواصلك مع خبز ريف 💚\n\n"
