@@ -328,48 +328,6 @@ import sqlite3
 
 DB_FILE = "orders.db"
 
-# ===== Verify webhook =====
-@app.route('/webhook', methods=['GET'])
-def verify():
-    mode = request.args.get("hub.mode")
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        return challenge, 200
-    return "Verification failed", 403
-
-# ===== Webhook POST =====
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    for entry in data.get("entry", []):
-        for event in entry.get("messaging", []):
-            sender_id = event["sender"]["id"]
-            if sender_id not in USER_ORDERS:
-                USER_ORDERS[sender_id] = {
-                    "items": {},
-                    "data_fields": [
-                        "الاسم ثلاثي", "اسم المحافظة", "اسم المنطقة", 
-                        "اسم الشارع + علامة مميزة", "رقم العمارة", "رقم الشقة", 
-                        "رقم هاتف ويفضل يكون عليه واتساب", "رقم هاتف اخر (ان وجد)"
-                    ],
-                    "wholesale_fields": ["الاسم", "المحافظة", "المنطقة", "محل أم أون لاين", "رقم التليفون"],
-                    "current_question": 0,
-                    "current_wholesale_question": 0,
-                    "customer_data": {},
-                    "wholesale_data": {},
-                    "stage": "welcome"
-                }
-
-            if "message" in event and not event["message"].get("is_echo", False):
-                if "quick_reply" in event["message"]:
-                    payload = event["message"]["quick_reply"]["payload"]
-                    handle_postback(sender_id, {"payload": payload})
-                else:
-                    handle_message(sender_id, event["message"])
-            elif "postback" in event:
-                handle_postback(sender_id, event["postback"])
-    return "ok", 200
 
 # ===== Database helpers =====
 def get_user_data_by_phone(phone):
@@ -745,6 +703,53 @@ def cancel_order(sender_id):
     USER_ORDERS[sender_id]["items"] = {}
     USER_ORDERS[sender_id]["stage"] = "welcome"
     send_welcome(sender_id)
+
+
+
+# ===== Verify webhook =====
+@app.route('/webhook', methods=['GET'])
+def verify():
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        return challenge, 200
+    return "Verification failed", 403
+
+# ===== Webhook POST =====
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    for entry in data.get("entry", []):
+        for event in entry.get("messaging", []):
+            sender_id = event["sender"]["id"]
+            if sender_id not in USER_ORDERS:
+                USER_ORDERS[sender_id] = {
+                    "items": {},
+                    "data_fields": [
+                        "الاسم ثلاثي", "اسم المحافظة", "اسم المنطقة", 
+                        "اسم الشارع + علامة مميزة", "رقم العمارة", "رقم الشقة", 
+                        "رقم هاتف ويفضل يكون عليه واتساب", "رقم هاتف اخر (ان وجد)"
+                    ],
+                    "wholesale_fields": ["الاسم", "المحافظة", "المنطقة", "محل أم أون لاين", "رقم التليفون"],
+                    "current_question": 0,
+                    "current_wholesale_question": 0,
+                    "customer_data": {},
+                    "wholesale_data": {},
+                    "stage": "welcome"
+                }
+
+            if "message" in event and not event["message"].get("is_echo", False):
+                if "quick_reply" in event["message"]:
+                    payload = event["message"]["quick_reply"]["payload"]
+                    handle_postback(sender_id, {"payload": payload})
+                else:
+                    handle_message(sender_id, event["message"])
+            elif "postback" in event:
+                handle_postback(sender_id, event["postback"])
+    return "ok", 200
+
+
 
 
 # ===== Run Flask =====
