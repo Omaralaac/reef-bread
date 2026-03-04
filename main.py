@@ -724,6 +724,175 @@ def handle_message(sender_id, message):
     if user["stage"] == "welcome" or text.lower() in ["menu", "القائمة", "الرئيسية"]:
         send_welcome(sender_id)
 
+def send_inquiry_options(sender_id):
+    quick_replies = [
+        {"content_type": "text", "title": "1️⃣ الأسعار", "payload": "INQ_PRICES"},
+        {"content_type": "text", "title": "2️⃣ العروض المتاحة", "payload": "INQ_OFFERS"},
+        {"content_type": "text", "title": "3️⃣ مكونات الخبز", "payload": "INQ_INGREDIENTS"},
+        {"content_type": "text", "title": "4️⃣ كيفية حفظ المنتج", "payload": "INQ_STORAGE"},
+        {"content_type": "text", "title": "5️⃣ الجلوتين", "payload": "INQ_GLUTEN"},
+        {"content_type": "text", "title": "🏠 العودة للقائمة الرئيسية", "payload": "MAIN_MENU"}
+    ]
+    send_quick_replies(sender_id, "اختر نوع الاستفسار:", quick_replies)
+
+def handle_inquiry(sender_id, payload):
+
+    # =============================
+    # الأسعار
+    # =============================
+    if payload == "INQ_PRICES":
+        text = (
+            "💰 أسعار الخبز:\n"
+            "خبز الشعير: 53 جنيه\n"
+            "خبز الشوفان: 62 جنيه\n"
+            "خبز الشيا: 62 جنيه\n"
+            "خبز الكتان: 54 جنيه\n"
+            "خبز أسمر: 54 جنيه\n"
+            "خبز عالي الألياف: 56 جنيه\n"
+            "خبز عالي البروتين: 69 جنيه"
+        )
+        send_message(sender_id, text)
+
+    # =============================
+    # العروض
+    # =============================
+    elif payload == "INQ_OFFERS":
+        text = (
+            "🎉 عروض رمضان المبارك:\n"
+            "✅ التوصيل مجاني عند طلب 5 أكياس\n"
+            "✅ كيس هدية + توصيل مجاني عند طلب 8 أكياس"
+        )
+        send_message(sender_id, text)
+
+    # =============================
+    # مكونات الخبز (يعرض الأنواع فقط)
+    # =============================
+    elif payload == "INQ_INGREDIENTS":
+
+        quick_replies = []
+
+        for bread_name in BREAD_INGREDIENTS.keys():
+            quick_replies.append({
+                "content_type": "text",
+                "title": bread_name,
+                "payload": f"ING_{bread_name}"
+            })
+
+        quick_replies.append({
+            "content_type": "text",
+            "title": "🏠 القائمة الرئيسية",
+            "payload": "MAIN_MENU"
+        })
+
+        send_quick_replies(sender_id, "اختر نوع الخبز لعرض المكونات 👇", quick_replies)
+        return
+
+    # =============================
+    # التخزين
+    # =============================
+    elif payload == "INQ_STORAGE":
+        text = (
+            "📦 كيفية حفظ المنتج:\n"
+            "❄️ يخزن في الفريزر لمدة 6 أشهر\n"
+            "🧊 يخزن في الثلاجة لمدة شهر\n"
+            "🌡️ يخزن خارج الثلاجة لمدة 10 أيام\n"
+            "⏳ بعد الخروج من الفريزر/الثلاجة اتركه دقائق للفك بدون تسخين"
+        )
+        send_message(sender_id, text)
+
+    # =============================
+    # الجلوتين
+    # =============================
+    elif payload == "INQ_GLUTEN":
+        text = (
+        "أهم المعلومات الصحية عن خبز ريف 🌱\n"
+        "- جميع الأنواع خالية تمامًا من الدقيق الأبيض\n"
+        "- تحتوي كل الأنواع على نسبة قليلة جداً من الدقيق الأسمر لا تتعدّى 15% للباكيت\n"
+        "- كما تحتوي على نسبة منخفضة جداً من الجلوتين لا تتعدّى 15% للباكيت\n\n"
+        "علشان كدا خبز ريف اختيار صحي ومتوازن، ومناسب لأنظمة غذائية مختلفة 💚"
+        )
+        send_message(sender_id, text)
+
+# =============================
+    # الجملة
+    # =============================
+    elif payload == "INQ_WHOLESALE":
+        USER_ORDERS[sender_id]["stage"] = "wholesale"
+        USER_ORDERS[sender_id]["wholesale_data"] = {}
+        USER_ORDERS[sender_id]["wholesale_fields"] = [
+            "الاسم",
+            "المحافظة",
+            "المنطقة",
+            "رقم التليفون"
+        ]
+        USER_ORDERS[sender_id]["current_wholesale_question"] = 0
+        send_message(sender_id, "من فضلك اكتب الاسم:") 
+        return # ضروري جداً لمنع الكود من إكمال إرسال أزرار الاستفسارات
+
+    elif payload == "MAIN_MENU":
+        send_main_menu(sender_id)
+        return
+
+    # =============================
+    # أزرار المتابعة بعد أي استفسار
+    # =============================
+    quick_replies = [
+        {"content_type": "text", "title": "🛒 طلب أوردر", "payload": "START_ORDER"},
+        {"content_type": "text", "title": "🔙 القائمة السابقة", "payload": "INQUIRY_MENU"},
+        {"content_type": "text", "title": "🏠 القائمة الرئيسية", "payload": "MAIN_MENU"}
+    ]
+
+    send_quick_replies(sender_id, "اختر أحد الخيارات:", quick_replies)
+
+# ... (الدوال السابقة مثل send_message و save_order_to_excel)
+
+# 1. ضع الدالة هنا
+def process_order_action(sender_id, action_type):
+    user = USER_ORDERS.get(sender_id, {})
+    # جلب البيانات التي تم سحبها من الإكسيل في الخطوة السابقة
+    data = user.get("customer_data", {})
+    
+    # 1. تجهيز نص الرسالة الموحد بالتنسيق التفصيلي
+    # استخدمنا الرموز التعبيرية (Emojis) لتمييز نوع الطلب (إلغاء ⚠️ أو استفسار ❓)
+    header_emoji = "⚠️" if action_type == "إلغاء" else "❓"
+    
+    admin_msg = (
+        f"{header_emoji} **طلب {action_type} أوردر قائم!**\n\n"
+        "👤 **بيانات العميل:**\n"
+        f"الاسم ثلاثي: {data.get('الاسم ثلاثي', '')}\n"
+        f"اسم المحافظة: {data.get('اسم المحافظة', '')}\n"
+        f"اسم المنطقة: {data.get('اسم المنطقة', '')}\n"
+        f"اسم الشارع + علامة مميزة: {data.get('اسم الشارع + علامة مميزة', '')}\n"
+        f"رقم العمارة: {data.get('رقم العمارة', '')}\n"
+        f"رقم الشقة: {data.get('رقم الشقة', '')}\n"
+        f"رقم هاتف ويفضل يكون عليه واتساب: {data.get('رقم هاتف ويفضل يكون عليه واتساب', '')}\n"
+        f"رقم هاتف اخر (ان وجد): {data.get('رقم هاتف اخر (ان وجد)', '')}\n\n"
+        "📦 **تفاصيل الأوردر الأخير:**\n"
+        f"{data.get('الطلب', 'غير متوفر')}\n"
+        "-----------------\n"
+        f"🛠️ **نوع الإجراء المطلوب:** {action_type}"
+    )
+
+    # 2. إرسال الإشعار لجروب المتابعة (Tracking)
+    # نستخدم المتغيرات العالمية TRACKING_BOT_TOKEN و TRACKING_CHAT_ID
+    send_telegram_notification(
+        admin_msg, 
+        TRACKING_BOT_TOKEN, 
+        TRACKING_CHAT_ID
+    )
+
+    # 3. الرد على العميل في فيسبوك بناءً على نوع الطلب
+    if action_type == "إلغاء":
+        response_text = "✅ تم إرسال طلب الإلغاء للإدارة، وسيتم التأكيد معك قريباً. 💚"
+    else:
+        response_text = "✅ تم إرسال استفسارك لقسم المتابعة، وسيتم الرد عليك فوراً. 💚"
+    
+    send_message(sender_id, response_text)
+
+    # 4. إعادة العميل للقائمة الرئيسية وتصفير الـ stage
+    user["stage"] = "welcome"
+    send_main_menu(sender_id)
+# 2. ثم تليها دالة handle_postback التي تستخدمها
 
 
 # ===== دالة handle_postback =====
