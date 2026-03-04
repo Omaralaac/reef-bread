@@ -527,40 +527,54 @@ def save_order_to_sql(customer_data, products):
     conn.commit()
     conn.close()
 
-# ===== handle_message (SQL-ready) =====
+# ===== إدارة جلسات المستخدم =====
+USER_SESSIONS = {}  # dict لتخزين الجلسات مؤقتًا، لاحقًا ممكن تربطه بـ SQL
+
+# ===== handle_message كامل - الجزء الأول =====
 def handle_message(sender_id, message):
+    # إنشاء أو استرجاع جلسة المستخدم
+    user = USER_SESSIONS.get(sender_id)
+    if not user:
+        USER_SESSIONS[sender_id] = {
+            "stage": "welcome",            # المرحلة الحالية
+            "customer_data": {},            # بيانات العميل
+            "data_fields": ["رقم هاتف ويفضل يكون عليه واتساب", "اسم المحافظة", "اسم المنطقة"],  # الأسئلة
+            "current_question": 0,          # مؤشر السؤال الحالي
+            "wholesale_fields": ["اسم الشركة", "رقم السجل التجاري", "البريد الإلكتروني"],  # بيانات الجملة
+            "current_wholesale_question": 0,
+            "wholesale_data": {}
+        }
+        user = USER_SESSIONS[sender_id]
+
+    # التعامل مع GET_STARTED
+    if "postback" in message:
+        payload = message["postback"].get("payload")
+        if payload == "GET_STARTED":
+            send_welcome(sender_id)  # عرض قائمة الخيارات مباشرة
+            return
+
+    # التعامل مع الرسائل النصية
     text = message.get("text", "").strip()
     if not text:
         return
 
-    # استرجاع أو إنشاء جلسة مستخدم مؤقتة (session) في SQL أو dict مؤقت للـ stage
-    # يمكن استبدال dict هذا بجدول user_sessions في DB
-    user = USER_SESSIONS.get(sender_id, {
-        "stage": "collecting_data",
-        "current_question": 0,
-        "data_fields": ["رقم هاتف ويفضل يكون عليه واتساب","اسم المحافظة","اسم المنطقة"],
-        "customer_data": {},
-        "wholesale_fields": ["الاسم","رقم الهاتف","الشركة","المنتجات"],
-        "current_wholesale_question": 0,
-        "wholesale_data": {}
-    })
-
-    # 1. جمع بيانات الأوردر العادي
+    # ===== 1. جمع بيانات الأوردر العادي =====
     if user["stage"] == "collecting_data":
         field = user["data_fields"][user["current_question"]]
 
+        # فحص رقم الهاتف
         if field == "رقم هاتف ويفضل يكون عليه واتساب":
             if not (text.isdigit() and len(text) == 11):
                 send_message(sender_id, "🚫 رقم غير صحيح! ارسل رقم صحيح مكون من 11 رقم.")
                 return
 
-            existing_data = get_user_data_by_phone(text)
+            existing_data = get_user_data_by_phone(text)  # لاحقًا من SQL
             if existing_data:
                 user["customer_data"] = existing_data
                 user["stage"] = "confirm_existing_data"
                 summary = (
-                    f"👋 أهلاً بك من جديد يا {existing_data.get('name', 'عميلنا العزيز')}!\n"
-                    f"📍 العنوان المسجل: {existing_data.get('province')} - {existing_data.get('area')}\n"
+                    f"👋 أهلاً بك من جديد يا {existing_data.get('الاسم ثلاثي', 'عميلنا العزيز')}!\n"
+                    f"📍 العنوان المسجل: {existing_data.get('اسم المحافظة')} - {existing_data.get('اسم المنطقة')}\n"
                     "هل تريد استخدام نفس البيانات السابقة؟"
                 )
                 quick_replies = [
@@ -568,34 +582,34 @@ def handle_message(sender_id, message):
                     {"content_type": "text", "title": "✏️ لا، بيانات جديدة", "payload": "RE-ENTER_DATA"}
                 ]
                 send_quick_replies(sender_id, summary, quick_replies)
-                USER_SESSIONS[sender_id] = user
                 return
 
+        # فحص المحافظة
         if field == "اسم المحافظة":
-            allowed = ["القاهرة","قاهره","القاهرة","القاهره","الجيزة","الجيزه","الاسكندرية","الاسكندريه","القليوبية","قليوبية","القليوبيه","القليوبيه"]
+            allowed = ["القاهرة","قاهره","قاهرة","القاهره","الجيزة","الجيزه","الاسكندرية","الاسكندريه","الإسكندرية","إسكندرية","القليوبية","قليوبية","قليوبيه","القليوبيه"]
             if text not in allowed:
                 send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
                 user["stage"] = "welcome"
                 send_main_menu(sender_id)
-                USER_SESSIONS[sender_id] = user
                 return
 
+        # فحص المنطقة (خاص بالقليوبية)
         if field == "اسم المنطقة":
             gov = user["customer_data"].get("اسم المحافظة", "")
-            allowed_qalyubia = ["العبور","شبرا الخيمة","شبرا الخيمه","الخصوص"]
+            allowed_qalyubia = ["العبور", "شبرا الخيمة", "شبرا الخيمه", "الخصوص"]
             if "قليوبية" in gov or "القليوبية" in gov:
                 if text not in allowed_qalyubia:
                     msg = (
-                        f"عذراً، منطقة '{text}' في القليوبية متاح لها موزعين فقط حالياً. 😔\n"
+                        f"عذراً، منطقة '{text}' في القليوبية متاح لها موزعين فقط حالياً. 😔\n\n"
                         "المناطق المتاحة للتوصيل المباشر: (العبور - شبرا الخيمة - الخصوص).\n"
                         "يمكنك البحث عن أقرب موزع لك من القائمة الرئيسية."
                     )
                     send_message(sender_id, msg)
                     user["stage"] = "welcome"
                     send_main_menu(sender_id)
-                    USER_SESSIONS[sender_id] = user
                     return
 
+        # حفظ البيانات الحالية والانتقال للسؤال التالي
         user["customer_data"][field] = text
         user["current_question"] += 1
 
@@ -604,65 +618,64 @@ def handle_message(sender_id, message):
         else:
             user["stage"] = "choosing_products"
             send_products(sender_id)
-
-        USER_SESSIONS[sender_id] = user
         return
 
-    # 2. البحث عن الموزعين
+# ===== 2. البحث عن الموزعين =====
     elif user["stage"] == "search_distributor":
-        result = get_distributors(text)
+        result = get_distributors(text)  # لاحقًا يمكن الربط بقاعدة SQL
         if result == "DIRECT_DELIVERY_ONLY":
             send_message(sender_id, "📍 هذه المنطقة متاح بها توصيل للمنازل فقط.\nاضغط '🛒 طلب أوردر' للبدء.")
         elif result == "OUT_OF_SCOPE":
             send_message(sender_id, "بعتذر لحضرتك ولكن منطقة حضرتك خارج حيز التوصيل حالياً. 😔")
         else:
             send_message(sender_id, result)
-
+        
         user["stage"] = "welcome"
         send_main_menu(sender_id)
-        USER_SESSIONS[sender_id] = user
         return
 
-    # 3. بيانات الجملة (Wholesale)
+# ===== 3. بيانات الجملة (Wholesale) =====
     elif user["stage"] == "wholesale":
         fields = user.get("wholesale_fields", [])
-        idx = user.get("current_wholesale_question", 0)
+        current_idx = user.get("current_wholesale_question", 0)
 
-        if idx < len(fields):
-            user["wholesale_data"][fields[idx]] = text
+        if current_idx < len(fields):
+            user["wholesale_data"][fields[current_idx]] = text
             user["current_wholesale_question"] += 1
-
+            
             if user["current_wholesale_question"] < len(fields):
-                send_message(sender_id, f"من فضلك اكتب {fields[user['current_wholesale_question']]}:")
+                next_q = fields[user["current_wholesale_question"]]
+                send_message(sender_id, f"من فضلك اكتب {next_q}:")
             else:
+                # حفظ البيانات لاحقًا في SQL
                 save_wholesale_to_sql(user["wholesale_data"])
                 send_message(sender_id, "✅ تم تسجيل بياناتك بنجاح. سيتواصل معك قسم الجملة قريباً. 💚")
+                
+                # إعادة تصفير بيانات الجلسة
                 user["stage"] = "welcome"
                 user["current_wholesale_question"] = 0
                 user["wholesale_data"] = {}
                 send_main_menu(sender_id)
-
         else:
             user["stage"] = "welcome"
             user["current_wholesale_question"] = 0
             send_main_menu(sender_id)
-
-        USER_SESSIONS[sender_id] = user
         return
 
-    # 4. تتبع الأوردر
+# ===== 4. تتبع الطلبات =====
     elif user["stage"] == "track_ask_phone":
-        existing_data = get_user_data_by_phone(text)
-
+        existing_data = get_user_data_by_phone(text)  # لاحقًا SQL
+        
         if existing_data:
-            last_order_details = existing_data.get('order_text', 'لا يوجد طلبات سابقة')
+            last_order_details = existing_data.get('الطلب', 'لا يوجد طلبات سابقة')
+            
             user["customer_data"] = existing_data
             user["temp_phone"] = text
             user["stage"] = "order_found_options"
-
+            
             summary = (
-                f"✅ تم العثور على بياناتك يا {existing_data.get('name', 'فندم')}!\n"
-                f"📍 العنوان: {existing_data.get('province')} - {existing_data.get('area')}\n"
+                f"✅ تم العثور على بياناتك يا {existing_data.get('الاسم ثلاثي', 'فندم')}!\n"
+                f"📍 العنوان: {existing_data.get('اسم المحافظة')} - {existing_data.get('اسم المنطقة')}\n"
                 f"📦 أخر أوردر ليك كان: ({last_order_details})\n\n"
                 "كيف يمكننا مساعدتك اليوم؟"
             )
@@ -673,6 +686,7 @@ def handle_message(sender_id, message):
                 {"content_type": "text", "title": "🏠 القائمة الرئيسية", "payload": "MAIN_MENU"}
             ]
             send_quick_replies(sender_id, summary, quick_replies)
+        
         else:
             msg = (
                 "لم نجد أي طلبات مسجلة بهذا الرقم حالياً 🧐\n\n"
@@ -685,14 +699,11 @@ def handle_message(sender_id, message):
                 {"content_type": "text", "title": "🏠 العودة للرئيسية", "payload": "MAIN_MENU"}
             ]
             send_quick_replies(sender_id, msg, quick_replies)
-
-        USER_SESSIONS[sender_id] = user
         return
 
-    # العودة للقائمة الرئيسية
+# ===== 5. العودة للقائمة الرئيسية =====
     if user["stage"] == "welcome" or text.lower() in ["menu", "القائمة", "الرئيسية"]:
         send_welcome(sender_id)
-        USER_SESSIONS[sender_id] = user
 
 
 
