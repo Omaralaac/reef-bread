@@ -60,6 +60,7 @@ def init_db():
             """)
             conn.commit()
         print(f"✅ قاعدة البيانات {DB_FILE} جاهزة")
+init_db()
 
 # ===== Products =====
 PRODUCTS = {
