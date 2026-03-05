@@ -235,7 +235,16 @@ def delete_order_by_phone(phone_number):
         print(f"❌ فشل حذف الطلب: {e}")
         return False
     
-
+def delete_order_from_excel(order_id):
+    try:
+        with sqlite3.connect("orders.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+            conn.commit()
+        return True
+    except Exception as e:
+        print("Delete order error:", e)
+        return False
 
 def send_wholesale_telegram_notification(text):
     url = f"https://api.telegram.org/bot{WHOLESALE_TELEGRAM_BOT_TOKEN}/sendMessage"
