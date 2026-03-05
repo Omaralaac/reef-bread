@@ -440,6 +440,7 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
+    
     user = USER_ORDERS.get(sender_id)
     if not user:
         return
@@ -448,6 +449,23 @@ def handle_message(sender_id, message):
     if not text:
         return
 
+
+     restricted_stages = [
+        "ordering",
+        "adding_to_existing",
+        "order_found_options"
+    ]
+
+    if user.get("stage") in restricted_stages:
+        send_message(sender_id, "👇 برجاء اختيار أحد الخيارات المتاحة من الأزرار بالأسفل.")
+
+        # إعادة عرض الخيارات
+        if user["stage"] in ["ordering", "adding_to_existing"]:
+            send_products(sender_id)
+
+        return
+    
+    
     # ===============================
     # 1️⃣ جمع بيانات الأوردر العادي
     # ===============================
@@ -1239,6 +1257,22 @@ def update_existing_order_with_new_items(sender_id):
     return combined_text, final_total_with_shipping, final_delivery, final_products_price
 
 
+def send_whatsapp_confirmation(phone, text):
+    url = "API_URL"
+
+    payload = {
+        "phone": phone,
+        "message": text
+    }
+
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print("WhatsApp Error:", e)
+
+
+
+
 def confirm_order(sender_id):
     user = USER_ORDERS.get(sender_id)
     if not user: return
@@ -1304,6 +1338,8 @@ def confirm_order(sender_id):
         )
         send_telegram_notification(telegram_text)
 
+
+        
         # رسالة تأكيد للعميل على الفيس بوك
         special_area = user["customer_data"].get("اسم المنطقة","")
         if special_area in ["حلوان","15 مايو"]:
@@ -1311,6 +1347,45 @@ def confirm_order(sender_id):
         else:
             text = "🎉 تم تأكيد طلب حضرتك بنجاح!\nطلبك هيوصل حضرتك في خلال 48 ساعة 🚚💚"
         send_message(sender_id, text)
+
+        phone = user["customer_data"].get("رقم هاتف ويفضل يكون عليه واتساب","")
+
+        special_area = user["customer_data"].get("اسم المنطقة","")
+
+        if special_area in ["حلوان","15 مايو"]:
+        delivery_time = "طلبك هيوصل يوم الثلاثاء القادم 🚚"
+        else:
+        delivery_time = "طلبك هيوصل خلال 48 ساعة 🚚"
+
+        # تجهيز العنوان
+        gov = user["customer_data"].get("اسم المحافظة","")
+        area = user["customer_data"].get("اسم المنطقة","")
+        street = user["customer_data"].get("اسم الشارع + علامة مميزة","")
+        building = user["customer_data"].get("رقم العمارة","")
+        apartment = user["customer_data"].get("رقم الشقة","")
+
+        address_text = f"{gov} - {area}\n{street}\nعمارة {building} - شقة {apartment}"
+
+        whatsapp_text = f"""🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
+
+        📦 تفاصيل الطلب:
+        {excel_order_details}
+
+        💰 الإجمالي: {total_price} جنيه
+        🚚 التوصيل: {delivery_text}
+
+        📍 عنوان التوصيل:
+        {address_text}
+
+        ⏳ {delivery_time}
+
+        في حالة وجود أي تعديل على الطلب يرجى التواصل معنا.
+
+         شكراً لاختيارك خبز ريف 🌾   
+"""
+
+        send_whatsapp_confirmation(phone, whatsapp_text)
+
 
     # --- تصفير الحالة والعودة للقائمة الرئيسية ---
     USER_ORDERS[sender_id] = {
