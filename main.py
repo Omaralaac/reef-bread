@@ -25,41 +25,15 @@ TRACKING_CHAT_ID = os.getenv("TRACKING_CHAT_ID")
 
 DB_FILE = "orders.db"  # اسم ملف قاعدة البيانات
 
-def init_db():
-    if not os.path.exists(DB_FILE):
-        with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            CREATE TABLE orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                province TEXT,
-                area TEXT,
-                street TEXT,
-                building TEXT,
-                apartment TEXT,
-                phone TEXT,
-                alt_phone TEXT,
-                order_text TEXT,
-                total_price TEXT,
-                delivery TEXT,
-                gift TEXT
-            )
-            """)
-            conn.commit()
-        print(f"✅ قاعدة البيانات {DB_FILE} جاهزة")
-        
-# استدعاء الدالة عند تشغيل البوت
-init_db()
 # ===== Products =====
 PRODUCTS = {
     "خبز الشعير": 53,
-    "خبز بذور الكتان": 54,
+    "خبز الكتان": 54,
     "خبز الشوفان": 62,
-    "خبز بذور الشيا": 62,
+    "خبز الشيا": 62,
     "الخبز الاسمر": 54,
-    "خبز عالي الألياف": 56,
-    "خبز عالي البروتين": 69
+    "عالي الألياف": 56,
+    "عالي البروتين": 69
 }
 
 # ===== Users =====
@@ -169,7 +143,7 @@ def update_order_by_phone(phone_number, order_text=None, total_price=None, deliv
             """, values)
             conn.commit()
     
-    conn.close()
+
 
 def find_order_row_by_phone(phone_number):
     conn = sqlite3.connect("orders.db")
@@ -1267,9 +1241,15 @@ def send_whatsapp_confirmation(phone, order_details, total_price, delivery_text,
     """
     إرسال رسالة واتساب للعميل تحتوي على تفاصيل الطلب والعنوان ووقت التوصيل.
     """
-    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-    message_body = f"""
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+        # تحويل الرقم للشكل الدولي لو العميل كتب 010...
+        if phone.startswith("0"):
+            phone = "+2" + phone
+
+        message_body = f"""
 🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
 
 📦 تفاصيل الطلب:
@@ -1287,13 +1267,20 @@ def send_whatsapp_confirmation(phone, order_details, total_price, delivery_text,
 📞 هاتف للتواصل: {customer_data.get('رقم هاتف ويفضل يكون عليه واتساب','')}
 
 شكراً لاختيارك خبز ريف 🌾
-    """
+"""
 
-    client.messages.create(
-        from_=TWILIO_WHATSAPP_FROM,  # الرقم اللي طلعته من Twilio
-        body=message_body,
-        to=f'whatsapp:{phone}'
-    )
+        client.messages.create(
+            from_=TWILIO_WHATSAPP_FROM,
+            body=message_body,
+            to=f"whatsapp:{phone}"
+        )
+
+        print("✅ تم إرسال رسالة واتساب للعميل")
+
+    except Exception as e:
+        print(f"❌ فشل إرسال واتساب: {e}")
+
+
 
 
 def confirm_order(sender_id):
