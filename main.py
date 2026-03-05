@@ -165,6 +165,24 @@ def update_order_by_phone(phone_number, order_text=None, total_price=None, deliv
     
     conn.close()
 
+def find_order_row_by_phone(phone_number):
+    conn = sqlite3.connect("orders.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM orders
+        WHERE phone = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (phone_number,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        return result[0]  # يرجع ID الأوردر
+    return None
+
 
 
 def save_order(customer_data, order_text, total_price, delivery_text, gift_text):
