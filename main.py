@@ -440,7 +440,6 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
-    
     user = USER_ORDERS.get(sender_id)
     if not user:
         return
@@ -449,8 +448,7 @@ def handle_message(sender_id, message):
     if not text:
         return
 
-
-     restricted_stages = [
+    restricted_stages = [
         "ordering",
         "adding_to_existing",
         "order_found_options"
@@ -459,11 +457,11 @@ def handle_message(sender_id, message):
     if user.get("stage") in restricted_stages:
         send_message(sender_id, "👇 برجاء اختيار أحد الخيارات المتاحة من الأزرار بالأسفل.")
 
-        # إعادة عرض الخيارات
+        # إعادة عرض الخيارات حسب المرحلة
         if user["stage"] in ["ordering", "adding_to_existing"]:
             send_products(sender_id)
 
-        return
+        return  # هذا الـ return داخل الـ if ليوقف استمرار تنفيذ الدالة
     
     
     # ===============================
