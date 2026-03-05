@@ -2,9 +2,15 @@ from flask import Flask, request
 import requests
 import os
 import sqlite3
+from twilio.rest import Client
 app = Flask(__name__)
 
 # ===== Load tokens =====
+
+
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM")
 
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
@@ -1255,20 +1261,39 @@ def update_existing_order_with_new_items(sender_id):
     return combined_text, final_total_with_shipping, final_delivery, final_products_price
 
 
-def send_whatsapp_confirmation(phone, text):
-    url = "API_URL"
+from twilio.rest import Client
 
-    payload = {
-        "phone": phone,
-        "message": text
-    }
+def send_whatsapp_confirmation(phone, order_details, total_price, delivery_text, customer_data, delivery_time):
+    """
+    إرسال رسالة واتساب للعميل تحتوي على تفاصيل الطلب والعنوان ووقت التوصيل.
+    """
+    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-    try:
-        requests.post(url, json=payload)
-    except Exception as e:
-        print("WhatsApp Error:", e)
+    message_body = f"""
+🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
 
+📦 تفاصيل الطلب:
+{order_details}
 
+💰 الإجمالي: {total_price} جنيه
+🚚 التوصيل: {delivery_text}
+
+🏠 عنوان التوصيل:
+{customer_data.get('اسم المحافظة','')} - {customer_data.get('اسم المنطقة','')}
+{customer_data.get('اسم الشارع + علامة مميزة','')}, عمارة: {customer_data.get('رقم العمارة','')}, شقة: {customer_data.get('رقم الشقة','')}
+
+⏰ {delivery_time}
+
+📞 هاتف للتواصل: {customer_data.get('رقم هاتف ويفضل يكون عليه واتساب','')}
+
+شكراً لاختيارك خبز ريف 🌾
+    """
+
+    client.messages.create(
+        from_=TWILIO_WHATSAPP_FROM,  # الرقم اللي طلعته من Twilio
+        body=message_body,
+        to=f'whatsapp:{phone}'
+    )
 
 
 def confirm_order(sender_id):
@@ -1276,97 +1301,50 @@ def confirm_order(sender_id):
     if not user:
         return
 
-    # --- الحالة الأولى: إضافة لطلب قائم ---
-    if user.get("stage") == "adding_to_existing":
-        combined_text, combined_price, final_delivery, _ = update_existing_order_with_new_items(sender_id)
-        
-        # إشعار لبوت المتابعة بصيغة التعديل
-        tracking_text = (
-            "🔄 **تعديل طلب قائم (إضافة منتجات)**\n\n"
-            f"👤 العميل: {user['customer_data'].get('الاسم ثلاثي')}\n"
-            f"📞 الهاتف: {user.get('temp_phone')}\n"
-            f"📝 الطلب الكامل بعد الإضافة: {combined_text}\n"
-            f"💰 الإجمالي الجديد: {combined_price}ج"
-        )
-        send_telegram_notification(tracking_text)
-        
-        # حفظ الطلب في قاعدة بيانات SQLite
-        save_order(
-            user["customer_data"],
-            combined_text,
-            combined_price,
-            "مجاني" if final_delivery == 0 else f"{final_delivery}ج",
-            "🎁 كيس هدية" if sum(user["items"].values()) >= 8 else "لا يوجد"
-        )
+    # --- طلب جديد ---
+    order = user.get("items", {})
+    total_qty = sum(order.values())
+    items_price = sum(PRODUCTS[name]*qty for name, qty in order.items())
+    delivery_cost = 0 if total_qty >= 5 else 30
+    total_price = items_price + delivery_cost
+    delivery_text = "مجاني" if delivery_cost == 0 else f"{delivery_cost}ج"
+    gift = "🎁 كيس هدية" if total_qty >= 8 else "لا يوجد"
 
-        text = "🎉 تم تحديث طلبك بنجاح بإضافة المنتجات الجديدة!\nسيصلك الأوردر كاملاً في الموعد المحدد 🚚💚"
-        send_message(sender_id, text)
+    excel_order_details = " | ".join([f"{name} x{qty}" for name, qty in order.items()])
+    save_order(user["customer_data"], excel_order_details, total_price, delivery_text, gift)
 
-    # --- الحالة الثانية: طلب جديد تماماً ---
+    # إشعار التليجرام
+    telegram_text = (
+        f"🛒 **طلب جديد!**\n\n"
+        "👤 **بيانات العميل:**\n"
+        f"الاسم ثلاثي: {user['customer_data'].get('الاسم ثلاثي','')}\n"
+        f"اسم المحافظة: {user['customer_data'].get('اسم المحافظة','')}\n"
+        f"اسم المنطقة: {user['customer_data'].get('اسم المنطقة','')}\n"
+        f"اسم الشارع + علامة مميزة: {user['customer_data'].get('اسم الشارع + علامة مميزة','')}\n"
+        f"رقم العمارة: {user['customer_data'].get('رقم العمارة','')}\n"
+        f"رقم الشقة: {user['customer_data'].get('رقم الشقة','')}\n"
+        f"رقم هاتف: {user['customer_data'].get('رقم هاتف ويفضل يكون عليه واتساب','')}\n\n"
+        "📦 **تفاصيل الطلب:**\n"
+        f"{excel_order_details}\n\n"
+        f"💰 **الإجمالي:** {total_price}ج\n"
+        f"🚚 **التوصيل:** {delivery_text}"
+    )
+    send_telegram_notification(telegram_text)
+
+    # تحديد وقت التوصيل
+    special_area = user["customer_data"].get("اسم المنطقة","")
+    if special_area in ["حلوان","15 مايو"]:
+        delivery_time = "طلبك هيوصل يوم الثلاثاء القادم 🚚"
     else:
-        order = user.get("items", {})
-        total_qty = sum(order.values())
-        items_price = sum(PRODUCTS[name]*qty for name, qty in order.items())
-        delivery_cost = 0 if total_qty >= 5 else 30
-        total_price = items_price + delivery_cost
-        delivery_text = "مجاني" if delivery_cost == 0 else f"{delivery_cost}ج"
-        gift = "🎁 كيس هدية" if total_qty >= 8 else "لا يوجد"
+        delivery_time = "طلبك هيوصل في خلال 48 ساعة 🚚"
 
-        # تجهيز نص الطلب لحفظه
-        excel_order_details = " | ".join([f"{name} x{qty}" for name, qty in order.items()])
+    # رسالة فيسبوك
+    text = f"🎉 تم تأكيد طلب حضرتك بنجاح!\n{delivery_time} 💚"
+    send_message(sender_id, text)
 
-        # حفظ الطلب في SQLite
-        save_order(user["customer_data"], excel_order_details, total_price, delivery_text, gift)
-
-        # إرسال إشعار التليجرام
-        telegram_text = (
-            f"🛒 **طلب جديد!**\n\n"
-            "👤 **بيانات العميل:**\n"
-            f"الاسم ثلاثي: {user['customer_data'].get('الاسم ثلاثي','')}\n"
-            f"اسم المحافظة: {user['customer_data'].get('اسم المحافظة','')}\n"
-            f"اسم المنطقة: {user['customer_data'].get('اسم المنطقة','')}\n"
-            f"اسم الشارع + علامة مميزة: {user['customer_data'].get('اسم الشارع + علامة مميزة','')}\n"
-            f"رقم العمارة: {user['customer_data'].get('رقم العمارة','')}\n"
-            f"رقم الشقة: {user['customer_data'].get('رقم الشقة','')}\n"
-            f"رقم هاتف: {user['customer_data'].get('رقم هاتف ويفضل يكون عليه واتساب','')}\n"
-            f"رقم هاتف آخر: {user['customer_data'].get('رقم هاتف اخر (ان وجد)','')}\n\n"
-            "📦 **تفاصيل الطلب:**\n"
-            f"{excel_order_details}\n\n"
-            f"💰 **الإجمالي:** {total_price}ج\n"
-            f"🚚 **التوصيل:** {delivery_text}"
-        )
-        send_telegram_notification(telegram_text)
-
-        # تحديد وقت التوصيل للعميل حسب المنطقة
-        special_area = user["customer_data"].get("اسم المنطقة","")
-        if special_area in ["حلوان","15 مايو"]:
-            delivery_time = "طلبك هيوصل يوم الثلاثاء القادم 🚚"
-        else:
-            delivery_time = "طلبك هيوصل في خلال 48 ساعة 🚚"
-
-        # رسالة تأكيد للعميل على الفيس بوك
-        text = f"🎉 تم تأكيد طلب حضرتك بنجاح!\n{delivery_time} 💚"
-        send_message(sender_id, text)
-
-        # رسالة واتساب تشمل تفاصيل الطلب والعنوان بالكامل
-        phone = user["customer_data"].get("رقم هاتف ويفضل يكون عليه واتساب","")
-        whatsapp_text = f"""
-🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
-
-📦 تفاصيل الطلب:
-{excel_order_details}
-
-💰 الإجمالي: {total_price} جنيه
-🚚 التوصيل: {delivery_text}
-
-🏠 عنوان التوصيل:
-{user['customer_data'].get('اسم المحافظة','')}, {user['customer_data'].get('اسم المنطقة','')}, {user['customer_data'].get('اسم الشارع + علامة مميزة','')}, عمارة {user['customer_data'].get('رقم العمارة','')}, شقة {user['customer_data'].get('رقم الشقة','')}
-
-⏰ {delivery_time}
-
-شكراً لاختيارك خبز ريف 🌾
-"""
-        send_whatsapp_confirmation(phone, whatsapp_text)
+    # رسالة واتساب
+    phone = user["customer_data"].get("رقم هاتف ويفضل يكون عليه واتساب","")
+    send_whatsapp_confirmation(phone, excel_order_details, total_price, delivery_text, user["customer_data"], delivery_time)
 
     
 
