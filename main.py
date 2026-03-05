@@ -1273,7 +1273,8 @@ def send_whatsapp_confirmation(phone, text):
 
 def confirm_order(sender_id):
     user = USER_ORDERS.get(sender_id)
-    if not user: return
+    if not user:
+        return
 
     # --- الحالة الأولى: إضافة لطلب قائم ---
     if user.get("stage") == "adding_to_existing":
@@ -1336,54 +1337,38 @@ def confirm_order(sender_id):
         )
         send_telegram_notification(telegram_text)
 
-
-        
-        # رسالة تأكيد للعميل على الفيس بوك
+        # تحديد وقت التوصيل للعميل حسب المنطقة
         special_area = user["customer_data"].get("اسم المنطقة","")
         if special_area in ["حلوان","15 مايو"]:
-            text = "🎉 تم تأكيد طلب حضرتك بنجاح!\nطلبك هيوصل حضرتك يوم الثلاثاء القادم 🚚💚"
+            delivery_time = "طلبك هيوصل يوم الثلاثاء القادم 🚚"
         else:
-            text = "🎉 تم تأكيد طلب حضرتك بنجاح!\nطلبك هيوصل حضرتك في خلال 48 ساعة 🚚💚"
+            delivery_time = "طلبك هيوصل في خلال 48 ساعة 🚚"
+
+        # رسالة تأكيد للعميل على الفيس بوك
+        text = f"🎉 تم تأكيد طلب حضرتك بنجاح!\n{delivery_time} 💚"
         send_message(sender_id, text)
 
+        # رسالة واتساب تشمل تفاصيل الطلب والعنوان بالكامل
         phone = user["customer_data"].get("رقم هاتف ويفضل يكون عليه واتساب","")
+        whatsapp_text = f"""
+🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
 
-        special_area = user["customer_data"].get("اسم المنطقة","")
+📦 تفاصيل الطلب:
+{excel_order_details}
 
-        if special_area in ["حلوان","15 مايو"]:
-        delivery_time = "طلبك هيوصل يوم الثلاثاء القادم 🚚"
-        else:
-        delivery_time = "طلبك هيوصل خلال 48 ساعة 🚚"
+💰 الإجمالي: {total_price} جنيه
+🚚 التوصيل: {delivery_text}
 
-        # تجهيز العنوان
-        gov = user["customer_data"].get("اسم المحافظة","")
-        area = user["customer_data"].get("اسم المنطقة","")
-        street = user["customer_data"].get("اسم الشارع + علامة مميزة","")
-        building = user["customer_data"].get("رقم العمارة","")
-        apartment = user["customer_data"].get("رقم الشقة","")
+🏠 عنوان التوصيل:
+{user['customer_data'].get('اسم المحافظة','')}, {user['customer_data'].get('اسم المنطقة','')}, {user['customer_data'].get('اسم الشارع + علامة مميزة','')}, عمارة {user['customer_data'].get('رقم العمارة','')}, شقة {user['customer_data'].get('رقم الشقة','')}
 
-        address_text = f"{gov} - {area}\n{street}\nعمارة {building} - شقة {apartment}"
+⏰ {delivery_time}
 
-        whatsapp_text = f"""🎉 تم تأكيد طلبك بنجاح من خبز ريف 💚
-
-        📦 تفاصيل الطلب:
-        {excel_order_details}
-
-        💰 الإجمالي: {total_price} جنيه
-        🚚 التوصيل: {delivery_text}
-
-        📍 عنوان التوصيل:
-        {address_text}
-
-        ⏳ {delivery_time}
-
-        في حالة وجود أي تعديل على الطلب يرجى التواصل معنا.
-
-         شكراً لاختيارك خبز ريف 🌾   
+شكراً لاختيارك خبز ريف 🌾
 """
-
         send_whatsapp_confirmation(phone, whatsapp_text)
 
+    
 
     # --- تصفير الحالة والعودة للقائمة الرئيسية ---
     USER_ORDERS[sender_id] = {
