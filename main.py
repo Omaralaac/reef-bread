@@ -24,6 +24,42 @@ TRACKING_CHAT_ID = os.getenv("TRACKING_CHAT_ID")
 
 
 DB_FILE = "orders.db"  # اسم ملف قاعدة البيانات
+def init_db():
+    if not os.path.exists(DB_FILE):
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            CREATE TABLE orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                province TEXT,
+                area TEXT,
+                street TEXT,
+                building TEXT,
+                apartment TEXT,
+                phone TEXT,
+                alt_phone TEXT,
+                order_text TEXT,
+                total_price TEXT,
+                delivery TEXT,
+                gift TEXT
+            )
+            """)
+            # جدول الطلبات الجملة
+            cursor.execute("""
+            CREATE TABLE wholesale_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                province TEXT,
+                area TEXT,
+                online_shop TEXT,
+                phone TEXT,
+                activity TEXT,
+                quantity TEXT
+            )
+            """)
+            conn.commit()
+        print(f"✅ قاعدة البيانات {DB_FILE} جاهزة")
 
 # ===== Products =====
 PRODUCTS = {
@@ -234,42 +270,6 @@ def send_wholesale_telegram_notification(text):
     except Exception as e:
         print(f"❌ فشل إرسال إشعار الجملة: {e}")
 
-def init_db():
-    if not os.path.exists(DB_FILE):
-        with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            CREATE TABLE orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                province TEXT,
-                area TEXT,
-                street TEXT,
-                building TEXT,
-                apartment TEXT,
-                phone TEXT,
-                alt_phone TEXT,
-                order_text TEXT,
-                total_price TEXT,
-                delivery TEXT,
-                gift TEXT
-            )
-            """)
-            # جدول الطلبات الجملة
-            cursor.execute("""
-            CREATE TABLE wholesale_orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                province TEXT,
-                area TEXT,
-                online_shop TEXT,
-                phone TEXT,
-                activity TEXT,
-                quantity TEXT
-            )
-            """)
-            conn.commit()
-        print(f"✅ قاعدة البيانات {DB_FILE} جاهزة")
 
 def save_wholesale_to_db(data):
     with sqlite3.connect(DB_FILE) as conn:
