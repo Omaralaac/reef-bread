@@ -145,6 +145,16 @@ STAGE_INPUT_TYPE = {
     "track_ask_phone": "text"
 }
 
+def send_main_menu(sender_id):
+    quick_replies = [
+        {"content_type": "text", "title": "ℹ️ استفسار عن منتج", "payload": "INQUIRY_MENU"},
+        {"content_type": "text", "title": "🛒 طلب أوردر", "payload": "START_ORDER"},
+        {"content_type": "text", "title": "📦 متابعة/تعديل طلبك", "payload": "TRACK_ORDER_MENU"},
+        {"content_type": "text", "title": "📍 أماكن توافرنا", "payload": "FIND_DISTRIBUTORS"}, # الزر الجديد
+        {"content_type": "text", "title": "🏢 طلبات الجملة", "payload": "INQ_WHOLESALE"}
+    ]
+    send_quick_replies(sender_id, "مرحباً بك في خبز ريف 💚\nاختر أحد الخيارات:", quick_replies)
+
 def enforce_button_choice(sender_id, user, text):
     if not text:
         return False
@@ -470,15 +480,7 @@ def send_quick_replies(recipient_id, text, quick_replies):
     except Exception as e:
         print(f"❌ فشل إرسال Quick Replies فيسبوك: {e}")
 
-def send_main_menu(sender_id):
-    quick_replies = [
-        {"content_type": "text", "title": "ℹ️ استفسار عن منتج", "payload": "INQUIRY_MENU"},
-        {"content_type": "text", "title": "🛒 طلب أوردر", "payload": "START_ORDER"},
-        {"content_type": "text", "title": "📦 متابعة/تعديل طلبك", "payload": "TRACK_ORDER_MENU"},
-        {"content_type": "text", "title": "📍 أماكن توافرنا", "payload": "FIND_DISTRIBUTORS"}, # الزر الجديد
-        {"content_type": "text", "title": "🏢 طلبات الجملة", "payload": "INQ_WHOLESALE"}
-    ]
-    send_quick_replies(sender_id, "مرحباً بك في خبز ريف 💚\nاختر أحد الخيارات:", quick_replies)
+
 
 
 def send_welcome(sender_id):
@@ -581,8 +583,8 @@ def handle_message(sender_id, message):
 
             if text not in allowed:
                 send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
-                user["stage"] = "welcome"
-                send_main_menu(sender_id)
+                user["stage"] = "FIND_DISTRIBUTORS"
+                resend_stage_options(sender_id, "FIND_DISTRIBUTORS")
                 return
 
         # فحص خاص بالقليوبية
@@ -598,8 +600,8 @@ def handle_message(sender_id, message):
                         "يمكنك البحث عن أقرب موزع لك من القائمة الرئيسية."
                     )
                     send_message(sender_id, msg)
-                    user["stage"] = "welcome"
-                    send_main_menu(sender_id)
+                    user["stage"] = "FIND_DISTRIBUTORS"
+                    resend_stage_options(sender_id, "FIND_DISTRIBUTORS")
                     return
 
         # حفظ البيانات والانتقال للسؤال التالي
