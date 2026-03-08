@@ -3,6 +3,7 @@ import requests
 import os
 import sqlite3
 from twilio.rest import Client
+import random
 app = Flask(__name__)
 
 # ===== Load tokens =====
@@ -24,6 +25,19 @@ TRACKING_CHAT_ID = os.getenv("TRACKING_CHAT_ID")
 
 
 DB_FILE = "orders.db"  # اسم ملف قاعدة البيانات
+
+BUTTON_REMINDER_MESSAGES = [
+    "👇 من فضلك اختار من الأزرار الموجودة تحت عشان نكمل.",
+    "⚠️ الرسائل المكتوبة مش هتشتغل هنا، اختار زر من تحت.",
+    "😊 عشان نكمل مع بعض، اختار من الاختيارات اللي تحت.",
+    "⬇️ اضغط على أحد الأزرار بالأسفل للمتابعة.",
+    "❗ من فضلك استخدم الأزرار الموجودة تحت."
+]
+
+def send_button_reminder(sender_id):
+    msg = random.choice(BUTTON_REMINDER_MESSAGES)
+    send_message(sender_id, msg)
+
 def init_db():
     if not os.path.exists(DB_FILE):
         with sqlite3.connect(DB_FILE) as conn:
@@ -107,6 +121,71 @@ BREAD_INGREDIENTS = {
     "خبز عالي الألياف": "🟥 خبز عالي الألياف → 61 سعر حراري\nدقيق القمح حبة كاملة\nنخالة القمح\nقليل من أملاح البحر والخميرة\nكل أنواع الخبز خالية من السكر والدهون واللبن والمواد الحافظة",
     "خبز عالي البروتين": "🟧 خبز عالي البروتين → 58 سعر حراري\nبذور الكينوا\nدقيق جوز الهند\nدقيق اللوز\nدقيق القمح حبة كاملة\nقليل من أملاح البحر والخميرة\nكل أنواع الخبز خالية من السكر والدهون واللبن والمواد الحافظة"
 }
+
+def send_choose_button_message(sender_id):
+    message = (
+        "⚠️ من فضلك اختار من الأزرار الموجودة تحت 👇\n"
+        "الرسائل المكتوبة مش هتشتغل هنا."
+    )
+
+    send_message(sender_id, message)
+
+STAGE_INPUT_TYPE = {
+    "welcome": "button",
+    "choosing_products": "button",
+    "ordering": "button",
+    "adding_to_existing": "button",
+    "order_found_options": "button",
+    "confirm_existing_data": "button",
+    "confirm_order": "button",
+
+    "collecting_data": "text",
+    "search_distributor": "text",
+    "wholesale": "text",
+    "track_ask_phone": "text"
+}
+
+def enforce_input_type(sender_id, user, text):
+    if not text:
+    return False
+
+    stage = user.get("stage")
+
+    restricted_stages = [
+        "ordering",
+        "adding_to_existing",
+        "choosing_products",
+        "order_found_options",
+        "confirm_existing_data",
+        "confirm_order"
+    ]
+
+    if stage in restricted_stages:
+
+        send_button_reminder(sender_id)
+
+        resend_stage_options(sender_id, stage)
+
+        return True
+
+    return False
+
+def resend_stage_options(sender_id, stage):
+
+    if stage in ["ordering", "adding_to_existing", "choosing_products"]:
+        send_products(sender_id)
+
+    elif stage == "order_found_options":
+        show_order_options(sender_id)
+
+    elif stage == "confirm_existing_data":
+        show_confirm_data_buttons(sender_id)
+
+    elif stage == "confirm_order":
+        confirm_order(sender_id)
+
+    elif stage == "welcome":
+        send_main_menu(sender_id)
 
 def send_telegram_notification(message, bot_token=None, chat_id=None):
     # استخدام المتغيرات اللي أنت عرفتها في أول الكود كقيم افتراضية
@@ -421,6 +500,8 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
+    if enforce_button_choice(sender_id, user):
+        return
     user = USER_ORDERS.get(sender_id)
     if not user:
         return
@@ -429,18 +510,34 @@ def handle_message(sender_id, message):
     if not text:
         return
 
+    
     restricted_stages = [
         "ordering",
         "adding_to_existing",
-        "order_found_options"
+        "order_found_options",
+        "confirm_existing_data",
+        "confirm_order",
+        "choosing_products"
     ]
 
+    if enforce_input_type(sender_id, user, text):
+        return
+        
     if user.get("stage") in restricted_stages:
-        send_message(sender_id, "👇 برجاء اختيار أحد الخيارات المتاحة من الأزرار بالأسفل.")
+        send_button_reminder(sender_id)
 
         # إعادة عرض الخيارات حسب المرحلة
-        if user["stage"] in ["ordering", "adding_to_existing"]:
-            send_products(sender_id)
+        if user["stage"] in ["ordering", "adding_to_existing", "choosing_products"]:
+    send_products(sender_id)
+
+        elif user["stage"] == "order_found_options":
+    show_order_options(sender_id)
+
+        elif user["stage"] == "confirm_existing_data":
+    show_confirm_data_buttons(sender_id)
+
+        elif user["stage"] == "confirm_order":
+    confirm_order(sender_id)
 
         return  # هذا الـ return داخل الـ if ليوقف استمرار تنفيذ الدالة
     
