@@ -504,7 +504,6 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
-   
     user = USER_ORDERS.get(sender_id)
     if not user:
         return
@@ -513,40 +512,29 @@ def handle_message(sender_id, message):
     if not text:
         return
 
-    if enforce_button_choice(sender_id, user, text):
-        return
-    
-    restricted_stages = [
-        "ordering",
-        "adding_to_existing",
-        "order_found_options",
-        "confirm_existing_data",
-        "confirm_order",
-        "choosing_products"
-    ]
+    current_stage = user.get("stage", "welcome")
+    allowed_input = STAGE_INPUT_TYPE.get(current_stage, "text")
 
-    if user.get("stage") in restricted_stages:
+    # ===== تحقق Button Lock =====
+    if allowed_input == "button":
+        send_message(sender_id, "🚫 الرجاء استخدام الأزرار المتاحة فقط.")
         send_button_reminder(sender_id)
 
         # إعادة عرض الخيارات حسب المرحلة
-        if user["stage"] in ["ordering", "adding_to_existing", "choosing_products"]:
+        if current_stage in ["ordering", "adding_to_existing", "choosing_products"]:
             send_products(sender_id)
-
-        elif user["stage"] == "order_found_options":
+        elif current_stage == "order_found_options":
             show_order_options(sender_id)
-
-        elif user["stage"] == "confirm_existing_data":
+        elif current_stage == "confirm_existing_data":
             show_confirm_data_buttons(sender_id)
-
-        elif user["stage"] == "confirm_order":
+        elif current_stage == "confirm_order":
             confirm_order(sender_id)
+        return  # منع استمرار تنفيذ الدالة
 
-        return  # هذا الـ return داخل الـ if ليوقف استمرار تنفيذ الدالة
-    
     # ===============================
     # 1️⃣ جمع بيانات الأوردر العادي
     # ===============================
-    if user["stage"] == "collecting_data":
+    if current_stage == "collecting_data":
         field = user["data_fields"][user["current_question"]]
 
         # فحص رقم الهاتف
@@ -573,6 +561,9 @@ def handle_message(sender_id, message):
 
                 send_quick_replies(sender_id, summary, quick_replies)
                 return
+
+        # فحص المحافظات، المناطق، وحفظ البيانات كما في الكود الأصلي
+        # ... (استمر بالكود الحالي لبقية الأسئلة)
 
         # فحص المحافظة
         if field == "اسم المحافظة":
