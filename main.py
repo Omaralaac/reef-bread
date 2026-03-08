@@ -500,8 +500,7 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
-    if enforce_button_choice(sender_id, user):
-        return
+   
     user = USER_ORDERS.get(sender_id)
     if not user:
         return
@@ -510,6 +509,8 @@ def handle_message(sender_id, message):
     if not text:
         return
 
+     if enforce_button_choice(sender_id, user):
+        return
     
     restricted_stages = [
         "ordering",
