@@ -1079,8 +1079,7 @@ def ask_next_question(sender_id):
         send_products(sender_id)
 
 
-def send_products(sender_id):
-
+def send_products(sender_id, enforce_buttons=False):
     if not PRODUCTS:
         send_message(sender_id, "لا توجد منتجات متاحة حالياً.")
         return
@@ -1089,18 +1088,19 @@ def send_products(sender_id):
 
     for name, price in list(PRODUCTS.items())[:13]:  # حد أقصى 13 زر
         title = f"{name} - {price}ج"
-
-        # فيسبوك بيسمح بـ 20 حرف فقط للزر
         if len(title) > 20:
             title = title[:17] + "..."
-
         quick_replies.append({
             "content_type": "text",
             "title": title,
             "payload": f"PRODUCT_{name}"
         })
 
-    send_quick_replies(sender_id, "اختر المنتج:", quick_replies)
+    msg = "اختر المنتج:"
+    if enforce_buttons:
+        msg = random.choice(BUTTON_REMINDER_MESSAGES)  # اختيار رسالة عشوائية من القائمة
+
+    send_quick_replies(sender_id, msg, quick_replies)
 
 
 def send_quantity_menu(sender_id, product):
