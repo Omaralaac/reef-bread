@@ -504,17 +504,29 @@ def send_welcome(sender_id):
 
 
 def handle_message(sender_id, message):
+
+
     user = USER_ORDERS.get(sender_id)
     if not user:
+        # المستخدم جديد، انشئ بيانات له وأرسل الترحيب
+        USER_ORDERS[sender_id] = {"stage": "welcome"}
+        send_welcome(sender_id)
         return
-
+    user = USER_ORDERS.get(sender_id)  # حدث user بعد الإنشاء
     text = message.get("text", "").strip()
     if not text:
         return
 
     current_stage = user.get("stage", "welcome")
-    allowed_input = STAGE_INPUT_TYPE.get(current_stage, "text")
 
+    # لو المرحلة هي "welcome" (أول رسالة) أرسل الترحيب مباشرة وتوقف هنا
+    if current_stage == "welcome":
+        send_welcome(sender_id)
+        return
+
+    # هنا تستمر باقي منطق التعامل مع الرسائل، مثل التأكد من نوع الإدخال (زر أو نص)
+    # ...
+    allowed_input = STAGE_INPUT_TYPE.get(current_stage, "text")
     # ===== تحقق Button Lock =====
     if allowed_input == "button":
         send_message(sender_id, "🚫 الرجاء استخدام الأزرار المتاحة فقط.")
