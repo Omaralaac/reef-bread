@@ -27,31 +27,11 @@ TRACKING_CHAT_ID = os.getenv("TRACKING_CHAT_ID")
 DB_FILE = "orders.db"  # اسم ملف قاعدة البيانات
 
 BUTTON_REMINDER_MESSAGES = [
-    "👇 من فضلك اختر من الأزرار الموجودة تحت للمتابعة.",
-    "⚠️ الرسائل المكتوبة لن تعمل هنا، استخدم أحد الأزرار.",
-    "😊 لنكمل معًا، اضغط على الاختيار المناسب من الأسفل.",
-    "⬇️ اضغط على أحد الأزرار أدناه لإكمال الخطوات.",
-    "❗ من فضلك استخدم الأزرار الموجودة أسفل الرسالة.",
-    "✨ خطوة سهلة! اختر من الأزرار لتستمر.",
-    "🚀 لننطلق! اضغط على أحد الأزرار الموجودة أدناه.",
-    "💡 تلميح: الأزرار هي طريقك لإتمام العملية.",
-    "🙌 اختر الخيار المناسب من الأزرار أدناه للمتابعة.",
-    "🛠️ استخدم أحد الأزرار لإكمال المهمة بنجاح.",
-    "🎯 اضغط على أحد الأزرار لتصل مباشرة للمرحلة التالية.",
-    "📌 لا يمكننا متابعة الرسائل النصية هنا، استخدم الأزرار.",
-    "💚 خطوة بسيطة: اضغط على الاختيار المناسب من الأزرار.",
-    "📝 لا يمكن الكتابة هنا، الرجاء اختيار زر.",
-    "⚡ اختر بسرعة من الأزرار أدناه لنستمر بدون تأخير.",
-    "🎉 كل شيء جاهز! اختر أحد الأزرار للمتابعة.",
-    "🚦 لا يمكن إدخال نص الآن، استخدم الاختيارات أسفل الرسالة.",
-    "👍 اضغط على أحد الأزرار لإكمال الخطوة التالية.",
-    "💫 سهّل على نفسك: استخدم الأزرار لتحديد اختياراتك.",
-    "🔔 تذكير ودي: الأزرار هي الطريق الأسرع للمتابعة.",
-    "🛎️ اضغط على زر لتتقدم للمرحلة القادمة.",
-    "🎁 الأزرار أدناه ستوفر لك تجربة أسهل وأسرع!",
-    "🌟 خطوة صغيرة، اضغط على أحد الأزرار لتكمل.",
-    "📣 لا يمكن إدخال نص هنا، اختر زر من الأسفل.",
-    "💡 نصيحة: الأزرار تجعل العملية أسرع وأسهل!"
+    "👇 من فضلك اختار من الأزرار الموجودة تحت عشان نكمل.",
+    "⚠️ الرسائل المكتوبة مش هتشتغل هنا، اختار زر من تحت.",
+    "😊 عشان نكمل مع بعض، اختار من الاختيارات اللي تحت.",
+    "⬇️ اضغط على أحد الأزرار بالأسفل للمتابعة.",
+    "❗ من فضلك استخدم الأزرار الموجودة تحت."
 ]
 
 def send_button_reminder(sender_id):
@@ -523,15 +503,8 @@ def send_welcome(sender_id):
 
 
 
-# المراحل اللي مسموح فيها إدخال نصوص
-TEXT_ALLOWED_STAGES = [
-    "collecting_data",
-    "search_distributor",
-    "wholesale",
-    "track_ask_phone"
-]
-
 def handle_message(sender_id, message):
+
 
     user = USER_ORDERS.get(sender_id)
     if not user:
@@ -539,7 +512,6 @@ def handle_message(sender_id, message):
         USER_ORDERS[sender_id] = {"stage": "welcome"}
         send_welcome(sender_id)
         return
-
     user = USER_ORDERS.get(sender_id)  # حدث user بعد الإنشاء
     text = message.get("text", "").strip()
     if not text:
@@ -547,24 +519,30 @@ def handle_message(sender_id, message):
 
     current_stage = user.get("stage", "welcome")
 
-    # أول رسالة → الترحيب
+    # لو المرحلة هي "welcome" (أول رسالة) أرسل الترحيب مباشرة وتوقف هنا
     if current_stage == "welcome":
         send_welcome(sender_id)
         return
 
-    # تحديد نوع الإدخال بناءً على السماح بالتيكست
-    allowed_input = "text" if current_stage in TEXT_ALLOWED_STAGES else "button"
+    # هنا تستمر باقي منطق التعامل مع الرسائل، مثل التأكد من نوع الإدخال (زر أو نص)
+    # ...
+    allowed_input = STAGE_INPUT_TYPE.get(current_stage, "text")
+    # ===== تحقق Button Lock =====
+    if allowed_input == "button":
+        send_message(sender_id, "🚫 الرجاء استخدام الأزرار المتاحة فقط.")
+        send_button_reminder(sender_id)
 
-# ===== تحقق Button Lock =====
-if allowed_input == "button":
-    # اختيار رسالة عشوائية
-    reminder_msg = random.choice(BUTTON_REMINDER_MESSAGES)
-    send_message(sender_id, f"🚫 {reminder_msg}")
+        # إعادة عرض الخيارات حسب المرحلة
+        if current_stage in ["ordering", "adding_to_existing", "choosing_products"]:
+            send_products(sender_id)
+        elif current_stage == "order_found_options":
+            show_order_options(sender_id)
+        elif current_stage == "confirm_existing_data":
+            show_confirm_data_buttons(sender_id)
+        elif current_stage == "confirm_order":
+            confirm_order(sender_id)
+        return  # منع استمرار تنفيذ الدالة
 
-    # إعادة عرض الخيارات حسب المرحلة
-    resend_stage_options(sender_id, current_stage)
-    return
-        
     # ===============================
     # 1️⃣ جمع بيانات الأوردر العادي
     # ===============================
