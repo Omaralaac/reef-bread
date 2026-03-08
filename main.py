@@ -555,10 +555,13 @@ def handle_message(sender_id, message):
     # تحديد نوع الإدخال بناءً على السماح بالتيكست
     allowed_input = "text" if current_stage in TEXT_ALLOWED_STAGES else "button"
 
-    # ===== تحقق Button Lock =====
-    if allowed_input == "button":
+# ===== تحقق Button Lock =====
+if allowed_input == "button":
+    # اختيار رسالة عشوائية
     reminder_msg = random.choice(BUTTON_REMINDER_MESSAGES)
     send_message(sender_id, f"🚫 {reminder_msg}")
+
+    # إعادة عرض الخيارات حسب المرحلة
     resend_stage_options(sender_id, current_stage)
     return
         
