@@ -586,6 +586,7 @@ def handle_message(sender_id, message):
             if text not in allowed:
                 send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
                 user["stage"] = "FIND_DISTRIBUTORS"
+                send_message(sender_id, "📍 يمكنك الاطلاع على أماكن موزعينا المتاحة من خلال الضغط على خيار 'أماكن توافرنا' بالأسفل 👇")
                 send_main_menu(sender_id)
                 return
 
@@ -601,8 +602,9 @@ def handle_message(sender_id, message):
                         "المناطق المتاحة للتوصيل المباشر: (العبور - شبرا الخيمة - الخصوص).\n"
                         "يمكنك البحث عن أقرب موزع لك من القائمة الرئيسية."
                     )
-                    send_message(sender_id, msg)
-                    user["stage"] = "FIND_DISTRIBUTORS"
+                    send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
+                     user["stage"] = "FIND_DISTRIBUTORS"
+                    send_message(sender_id, "📍 يمكنك الاطلاع على أماكن موزعينا المتاحة من خلال الضغط على خيار 'أماكن توافرنا' بالأسفل 👇")
                     send_main_menu(sender_id)
                     return
 
