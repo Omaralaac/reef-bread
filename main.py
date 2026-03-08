@@ -145,7 +145,7 @@ STAGE_INPUT_TYPE = {
     "track_ask_phone": "text"
 }
 
-def enforce_input_type(sender_id, user, text):
+def enforce_button_choice(sender_id, user, text):
     if not text:
         return False
 
