@@ -528,16 +528,16 @@ def handle_message(sender_id, message):
 
         # إعادة عرض الخيارات حسب المرحلة
         if user["stage"] in ["ordering", "adding_to_existing", "choosing_products"]:
-    send_products(sender_id)
+            send_products(sender_id)
 
         elif user["stage"] == "order_found_options":
-    show_order_options(sender_id)
+            show_order_options(sender_id)
 
         elif user["stage"] == "confirm_existing_data":
-    show_confirm_data_buttons(sender_id)
+            show_confirm_data_buttons(sender_id)
 
         elif user["stage"] == "confirm_order":
-    confirm_order(sender_id)
+            confirm_order(sender_id)
 
         return  # هذا الـ return داخل الـ if ليوقف استمرار تنفيذ الدالة
     
