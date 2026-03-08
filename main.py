@@ -155,6 +155,24 @@ def send_main_menu(sender_id):
     ]
     send_quick_replies(sender_id, "مرحباً بك في خبز ريف 💚\nاختر أحد الخيارات:", quick_replies)
 
+def resend_stage_options(sender_id, stage):
+
+    if stage in ["ordering", "adding_to_existing", "choosing_products"]:
+        send_products(sender_id)
+
+    elif stage == "order_found_options":
+        show_order_options(sender_id)
+
+    elif stage == "confirm_existing_data":
+        show_confirm_data_buttons(sender_id)
+
+    elif stage == "confirm_order":
+        confirm_order(sender_id)
+
+    elif stage == "welcome":
+        send_main_menu(sender_id)
+
+
 def enforce_button_choice(sender_id, user, text):
     if not text:
         return False
@@ -180,22 +198,6 @@ def enforce_button_choice(sender_id, user, text):
 
     return False
 
-def resend_stage_options(sender_id, stage):
-
-    if stage in ["ordering", "adding_to_existing", "choosing_products"]:
-        send_products(sender_id)
-
-    elif stage == "order_found_options":
-        show_order_options(sender_id)
-
-    elif stage == "confirm_existing_data":
-        show_confirm_data_buttons(sender_id)
-
-    elif stage == "confirm_order":
-        confirm_order(sender_id)
-
-    elif stage == "welcome":
-        send_main_menu(sender_id)
 
 def send_telegram_notification(message, bot_token=None, chat_id=None):
     # استخدام المتغيرات اللي أنت عرفتها في أول الكود كقيم افتراضية
@@ -584,7 +586,7 @@ def handle_message(sender_id, message):
             if text not in allowed:
                 send_message(sender_id, "❌ نأسف 🙏 المحافظة خارج نطاق التوصيل المباشر حالياً.")
                 user["stage"] = "FIND_DISTRIBUTORS"
-                resend_stage_options(sender_id, "FIND_DISTRIBUTORS")
+                send_main_menu(sender_id)
                 return
 
         # فحص خاص بالقليوبية
@@ -601,7 +603,7 @@ def handle_message(sender_id, message):
                     )
                     send_message(sender_id, msg)
                     user["stage"] = "FIND_DISTRIBUTORS"
-                    resend_stage_options(sender_id, "FIND_DISTRIBUTORS")
+                    send_main_menu(sender_id)
                     return
 
         # حفظ البيانات والانتقال للسؤال التالي
