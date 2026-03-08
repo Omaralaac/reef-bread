@@ -147,7 +147,7 @@ STAGE_INPUT_TYPE = {
 
 def enforce_input_type(sender_id, user, text):
     if not text:
-    return False
+        return False
 
     stage = user.get("stage")
 
