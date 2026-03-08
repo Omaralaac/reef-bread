@@ -509,7 +509,7 @@ def handle_message(sender_id, message):
     if not text:
         return
 
-     if enforce_button_choice(sender_id, user):
+    if enforce_button_choice(sender_id, user):
         return
     
     restricted_stages = [
@@ -521,9 +521,6 @@ def handle_message(sender_id, message):
         "choosing_products"
     ]
 
-    if enforce_input_type(sender_id, user, text):
-        return
-        
     if user.get("stage") in restricted_stages:
         send_button_reminder(sender_id)
 
@@ -541,7 +538,6 @@ def handle_message(sender_id, message):
             confirm_order(sender_id)
 
         return  # هذا الـ return داخل الـ if ليوقف استمرار تنفيذ الدالة
-    
     
     # ===============================
     # 1️⃣ جمع بيانات الأوردر العادي
