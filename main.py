@@ -509,7 +509,7 @@ def handle_message(sender_id, message):
     if not text:
         return
 
-    if enforce_button_choice(sender_id, user):
+    if enforce_button_choice(sender_id, user, text):
         return
     
     restricted_stages = [
